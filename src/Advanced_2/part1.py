@@ -164,7 +164,7 @@ def import_data(FLAGS):
 
 #     rs = np.reshape(mnist.train.images[0], (28,28))
 #     toimage(rs).show()
-#     rs = np.reshape(X_train_bin[0], (28,28))
+#     rs = np.reshape(X_train[1], (28,28))
 #     toimage(rs).show()
 
     return X_train, y_train_dense.astype(int), X_test, y_test_dense.astype(int)
@@ -176,7 +176,7 @@ def run_part1_models(FLAGS):
     # Hyperparameters
     max_num_epochs = 100
     dropout_val = 0.55
-    learning_rate_val = 0.0001
+    learning_rate_val = 0.01
     decay = learning_rate_val / 20
     use_peepholes = False; peep_str='' #only for LSTM
     BATCH_SIZE = 128
@@ -184,6 +184,8 @@ def run_part1_models(FLAGS):
     # Import data
     X_train, y_train, X_test, y_test = import_data(FLAGS)
 
+    keep_prob = tf.placeholder(tf.float32, name='keep_prob')
+    learning_rate = tf.placeholder(tf.float32, shape=[])
     x = tf.placeholder(tf.float32, [None, 784, 1], name='x')
     if FLAGS.model[:2]=='P1':
         y_ = tf.placeholder(tf.int32, [None], name='y_')
@@ -191,7 +193,6 @@ def run_part1_models(FLAGS):
         y_ = tf.placeholder(tf.int32, [None, 783], name='y_')
 #     next_pixel = tf.placeholder(tf.int32, [None, 783], name='next_pixel')
     
-    keep_prob = tf.placeholder(tf.float32, name='keep_prob')
 
     if FLAGS.model=='P1_1x32_L':
         num_units = 32
@@ -224,12 +225,9 @@ def run_part1_models(FLAGS):
         y, cross_entropy = build_network_task1(x, num_units, cell, y_ ) 
     elif FLAGS.model[:2]=='P2':
         y, cross_entropy = build_network_task2(x, num_units, cell, y_ ) 
-
     
     tf.summary.scalar('CrossEntropy', cross_entropy)
-    
-    learning_rate = tf.placeholder(tf.float32, shape=[])
-    
+        
 #     train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(cross_entropy)
     train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
 
@@ -241,9 +239,7 @@ def run_part1_models(FLAGS):
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     tf.summary.scalar('accuracy', accuracy)
 
-
-    path_arr = [FLAGS.model, "drop{:.1f}".format(dropout_val), peep_str, 
-                    'bs' + str(BATCH_SIZE)]
+    path_arr = [FLAGS.model, "drop{:.1f}".format(dropout_val), peep_str, 'bs' + str(BATCH_SIZE)]
 
     db = DataBatcher(X_train, y_train)
 
