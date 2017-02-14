@@ -87,7 +87,7 @@ def build_network_task1(x, nrecurrent_units, cell, y_):
     y = tf.matmul(h_2, W_3) + b_3
     
     cross_entropy = tf.reduce_mean(
-        tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_, logits=y))
+        tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y))
     
     return y, cross_entropy
 
@@ -144,7 +144,7 @@ def import_data(FLAGS):
         y_train = X_train_bin
         y_test = X_test_bin   
 
-    ns = 0
+    ns = 5000
     if ns > 0:
         X_train = X_train[:ns]
         y_train = y_train[:ns]    
@@ -158,16 +158,17 @@ def import_data(FLAGS):
     X_test_bin = np.delete(X_test_bin, npixels-1, 1)
        
         
-    embedding = np.array([0,1,2,3,4,5,6,7,8,9])
-    y_train_dense = np.dot(y_train, embedding)  
-    y_test_dense = np.dot(y_test, embedding)  
+#     embedding = np.array([0,1,2,3,4,5,6,7,8,9])
+#     y_train = (np.dot(y_train, embedding)).astype(int)  
+#     y_test = (np.dot(y_test, embedding)).astype(int)  
+
 
 #     rs = np.reshape(mnist.train.images[0], (28,28))
 #     toimage(rs).show()
 #     rs = np.reshape(X_train[1], (28,28))
 #     toimage(rs).show()
 
-    return X_train, y_train_dense.astype(int), X_test, y_test_dense.astype(int)
+    return X_train, y_train, X_test, y_test
 
 def run_part1_models(FLAGS):
     print('Tensorflow version: ', tf.VERSION)
@@ -176,7 +177,7 @@ def run_part1_models(FLAGS):
     # Hyperparameters
     max_num_epochs = 100
     dropout_val = 0.55
-    learning_rate_val = 0.01
+    learning_rate_val = 0.001
     decay = learning_rate_val / 20
     use_peepholes = False; peep_str='' #only for LSTM
     BATCH_SIZE = 128
@@ -188,7 +189,7 @@ def run_part1_models(FLAGS):
     learning_rate = tf.placeholder(tf.float32, shape=[])
     x = tf.placeholder(tf.float32, [None, 784, 1], name='x')
     if FLAGS.model[:2]=='P1':
-        y_ = tf.placeholder(tf.int32, [None], name='y_')
+        y_ = tf.placeholder(tf.float32, [None,10], name='y_')
     elif FLAGS.model[:2]=='P2':
         y_ = tf.placeholder(tf.int32, [None, 783], name='y_')
 #     next_pixel = tf.placeholder(tf.int32, [None, 783], name='next_pixel')
@@ -232,9 +233,10 @@ def run_part1_models(FLAGS):
     train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
 
     # Test trained model
-    argm_y = tf.to_int32( tf.argmax(y, 1) )
-#     argm_y_ = tf.argmax(y_, 1)
-    argm_y_ = y_
+    argm_y = tf.argmax(y, 1)
+    argm_y_ = tf.argmax(y_, 1)
+#     argm_y = tf.to_int32( tf.argmax(y, 1) )
+#     argm_y_ = y_
     correct_prediction = tf.equal(argm_y, argm_y_)
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     tf.summary.scalar('accuracy', accuracy)
