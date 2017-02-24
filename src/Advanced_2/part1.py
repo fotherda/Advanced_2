@@ -10,6 +10,8 @@ import logging
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 import tensorflow as tf
 import matplotlib.pyplot as plt
+import datetime, time
+import pickle as pi
 
 from timeit import default_timer as timer
 
@@ -24,9 +26,6 @@ from scipy.misc import toimage
 
 
 
-root_dir = 'C:/Users/Dave/Documents/GI13-Advanced/Assignment2';
-summaries_dir = root_dir + '/Summaries';
-save_dir = root_dir;
 
 
 def weight_variable(shape):
@@ -118,7 +117,7 @@ def binarize(images, threshold=0.1):
 def add_dimension(images):
     return np.expand_dims(images, -1)
 
-def save_model(session, model_name):
+def save_model(session, model_name, root_dir):
     if not os.path.exists(root_dir + '/model/'):
         os.mkdir(root_dir + '/model/')
     saver = tf.train.Saver(write_version=1)
@@ -147,7 +146,7 @@ def import_data(FLAGS, num_train_examples):
         npixels = X_train_bin.shape[1]
         X_train = X_train_bin.astype(int)
         X_test = X_test_bin.astype(int)
-        if not FLAGS.use_saved:
+        if not FLAGS.use_saved or False:
             X_train = np.delete(X_train, npixels-1, 1) #remove last pixel
             X_test = np.delete(X_test, npixels-1, 1)   
         X_train = np.expand_dims(X_train, -1)
@@ -180,16 +179,23 @@ class Parser():
 def run_part1_models(FLAGS):
     print('Tensorflow version: ', tf.VERSION)
     print('PYTHON_PATH: ',sys.path)
+    print('model: ', FLAGS.model )
+    root_dir = os.getcwd()
+#     root_dir = 'C:/Users/Dave/Documents/GI13-Advanced/Assignment2';
+    summaries_dir = root_dir + '/Summaries';
+    fn = ''
 
-    ########## Hyperparameters #################
-    max_num_epochs = 70
-    dropout_val = 0.5
-    learning_rate_val = 0.01
     
-    decay = learning_rate_val / 2e8
+    ########## Hyperparameters #################
+    max_num_epochs = 200
+    dropout_val = 0.5
+    learning_rate_val = 3e-5
+    
+    decay = learning_rate_val / 2e4
     use_peepholes = False; peep_str='' #only for LSTM
     BATCH_SIZE = 32
     num_train_examples = 0
+    
     
     image_size = 784
     # Import data
@@ -221,6 +227,8 @@ def run_part1_models(FLAGS):
         
 #     train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(cross_entropy)
     train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
+#     train_step = tf.train.MomentumOptimizer(learning_rate, momentum=0.9).minimize(cross_entropy)
+    
 
     # Test trained model
     if ps._task=='P1':
@@ -228,9 +236,6 @@ def run_part1_models(FLAGS):
         correct_prediction = tf.equal(argm_y, y_)
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
         tf.summary.scalar('accuracy', accuracy)
-#     elif ps._task=='P2':
-#         argm_y = tf.to_int32( tf.argmax(y, 2) )
-#         argm_y = tf.to_int32( tf.greater(y, 0.5) )
 
     tf.summary.scalar('learning_rate', learning_rate)
     tf.summary.scalar('CrossEntropy', cross_entropy)
@@ -240,20 +245,27 @@ def run_part1_models(FLAGS):
 #     show_all_variables()
     db = DataBatcher(X_train, y_train)
 
+            
     with tf.Session() as sess:  
-#         sess = tf_debug.LocalCLIDebugWrapperSession(sess)
-#         sess.add_tensor_filter("has_inf_or_nan", tf_debug.has_inf_or_nan)     
+        # init operation
+        tf.global_variables_initializer().run()    
+        start_epoch = 0
                        
         if FLAGS.use_saved: #Restore saved model   
-#             fn = 'P2_1x032_G_drop0.5__bs32_lr0.005_nt0_38'
-            fn = 'P2_1x064_G_drop0.5__bs32_lr0.005_nt0_32'  
-            model_file_name = FLAGS.saved_model_dir + '/' + fn + '.ckpt'    
+#             fn = 'P2_1x032_G_drop0.5__bs32_lr0.005_nt0_38'; max_num_epochs=0
+#     fn = 'P2_1x064_G_drop0.5__bs32_lr0.005_nt0_32'; max_num_epochs=0  
+#             fn = 'P1_1x032_G_drop0.5__bs32_lr0.001_nt0_32'; max_num_epochs=0
+#             fn = 'P1_1x32_L_drop0.5__bs128_48'; max_num_epochs=0
+            fn = 'P1_3x032_L_drop0.5__bs32_lr2e-05_nt0_80'; start_epoch=81
+#             fn = 'P1_1x128_L_drop0.5__bs32_lr5e-06_nt0_18'; start_epoch=19  
+#             fn = 'P1_1x032_L_drop0.5__bs32_lr2e-05_nt0_54'; start_epoch=55
+
+            model_file_name = root_dir + '/model/' + fn + '.ckpt'    
 #             model_file_name = FLAGS.saved_model_dir + '/' + FLAGS.model + '.ckpt'    
             saver2restore = tf.train.Saver(write_version=1)
-            tf.global_variables_initializer().run()    
             saver2restore.restore(sess, model_file_name)
             
-        else: #Train new model
+#         else: #Train new model
             # Merge all the summaries and write them out to file
             merged = tf.summary.merge_all()
             
@@ -262,15 +274,12 @@ def run_part1_models(FLAGS):
             train_writer = tf.summary.FileWriter(dir_name + '/train', sess.graph)
             test_writer = tf.summary.FileWriter(dir_name + '/test')
             
-            # init operation
-            tf.global_variables_initializer().run()    
-            
-            conv_tester = ConvergenceTester(0.0005, lookback_window=5, decreasing=True) #stop if converged to within 0.05%
+            conv_tester = ConvergenceTester(0.0001, lookback_window=5, decreasing=True) #stop if converged to within 0.05%
             lrs = LearningRateScheduler(decay)
             ntrain = X_train.shape[0]
 
             # Train
-            for epoch in range(max_num_epochs):
+            for epoch in range(start_epoch, max_num_epochs):
                 start = timer()
            
                 for i in range(ntrain // BATCH_SIZE):
@@ -285,12 +294,12 @@ def run_part1_models(FLAGS):
                     if ps._task=='P1':
                         train_accuracy, train_loss, train_summary = sess.run([accuracy, cross_entropy, merged], feed_dict={x: X_train[:5000], y_: y_train[:5000], learning_rate: learning_rate_val, keep_prob: 1.0})                                      
                         test_accuracy, test_loss, test_summary = sess.run([accuracy, cross_entropy, merged], feed_dict={x: X_test, y_: y_test, learning_rate: learning_rate_val, keep_prob: 1.0})
-                        print("\nepoch %d, tr:te accuracy %g : %g loss %g : %g lr %g" % (epoch, train_accuracy, test_accuracy, train_loss, test_loss, learning_rate_val))
+                        print("\nepoch %d, tr:te accuracy %g : %g loss %g : %g lr %g et %s" % (epoch, train_accuracy, test_accuracy, train_loss, test_loss, learning_rate_val, str(datetime.timedelta(seconds=end-start))))
                                    
                     elif ps._task=='P2':
-                        train_loss, train_summary = sess.run([cross_entropy, merged], feed_dict={x: X_train[:1000], y_: y_train[:1000], learning_rate: learning_rate_val, keep_prob: 1.0})                                      
-                        test_loss, test_summary = sess.run([cross_entropy, merged], feed_dict={x: X_test, y_: y_test, learning_rate: learning_rate_val, keep_prob: 1.0})
-                        print("\nepoch %d, loss %g : %g lr %g et %g" % (epoch, train_loss, test_loss, learning_rate_val, end-start))
+                        train_loss, train_summary = sess.run([cross_entropy, merged], feed_dict={x: X_train[:1000,:783], y_: y_train[:1000], learning_rate: learning_rate_val, keep_prob: 1.0})                                      
+                        test_loss, test_summary = sess.run([cross_entropy, merged], feed_dict={x: X_test[:,:783], y_: y_test, learning_rate: learning_rate_val, keep_prob: 1.0})
+                        print("\nepoch %d, loss %g : %g lr %g et %s" % (epoch, train_loss, test_loss, learning_rate_val, str(datetime.timedelta(seconds=end-start))))
                                    
                     if np.isnan(train_loss) or np.isnan(test_loss):
                         exit()
@@ -304,89 +313,106 @@ def run_part1_models(FLAGS):
                         
                 #save trained model
                 model_file_name = '_'.join(path_arr)+'_'+ str(epoch) #write every epoch
-                save_model(sess, model_file_name)
-            exit()
+                save_model(sess, model_file_name, root_dir)
+#             exit()
             
         #print final results        
-#         print("Training Error rate:", 1-accuracy.eval({x: X_train, y_: y_train, keep_prob: 1.0}))
-#         print("Test Error rate:", 1-accuracy.eval({x: X_test, y_: y_test, keep_prob: 1.0}))
+#         train_loss, train_accuracy = sess.run([cross_entropy, accuracy], feed_dict={x: X_train, y_: y_train, keep_prob: 1.0})                                      
+#         test_loss, test_accuracy = sess.run([cross_entropy, accuracy], feed_dict={x: X_test, y_: y_test, keep_prob: 1.0})                                      
+#         print("\ntrain loss %.6f train accuracy %.6f" % (train_loss, train_accuracy))
+#         print("\ntest loss %.6f test accuracy %.6f" % (test_loss, test_accuracy))
+#         exit()
 
-#         in_painting(y, x, y_, keep_prob, sess)
+#         task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root_dir)
 
-        #prediction
-        nsamples = 100
-        mask_length = 300
-        db2 = DataBatcher(X_test, y_test)
-        batch_xs, batch_ys = db2.next_batch(nsamples)
-        ground_truth_images = np.copy(batch_xs)
-                    
-        pixel_preds = np.zeros((nsamples, mask_length), dtype='float32')            
-        pixel_gt = np.zeros((nsamples, mask_length), dtype='float32')            
-        pixel_idx = batch_xs.shape[1] - mask_length - 1                  
-        for i in range(mask_length):
-            pred = sess.run(y, feed_dict={x: batch_xs[:,:783], y_: batch_ys[:,:783], keep_prob: 1.0})
+        # Task 3
+#         in_painting(y, x, y_, keep_prob, sess, root_dir)
 
-            pixel_preds[:, i] = pred[:, pixel_idx]
-            pixel_idx += 1
-            pixel_gt[:, i] = batch_xs[:, pixel_idx, 0]
-            batch_xs[:, pixel_idx, 0] = pixel_preds[:, i]
-        
-        get_cross_entropy(ground_truth_images, pixel_preds, pixel_gt)    
-        
-        
-def get_in_paintings(images, gt_images, nip):
     
-#     images_ip = np.copy( np.expand_dims(images, 1) ) 
-    images_ip = np.zeros( (images.shape[0], nip, images.shape[1]) ) 
-    gt_at_mp = np.zeros(gt_images.shape[0])
+        # Task 2: prediction
+def task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root_dir):
+#         train_loss = sess.run(cross_entropy, feed_dict={x: X_train, y_: y_train, keep_prob: 1.0})                                      
+#         test_loss = sess.run(cross_entropy, feed_dict={x: X_test, y_: y_test, keep_prob: 1.0})                                      
+#         print("\ntrain loss %g" % (train_loss))
+#         print("\ntest loss %g" % (test_loss))
+                
+    nsamples = 10
+    mask_length = 300
+    db2 = DataBatcher(X_test, y_test)
+    batch_xs, batch_ys = db2.next_batch(nsamples)
+    ground_truth_images = np.copy(batch_xs)
+                
+    pixel_preds = np.zeros((nsamples, mask_length), dtype='float32')            
+    pixel_gt = np.zeros((nsamples, mask_length), dtype='float32')            
+    pixel_idx = batch_xs.shape[1] - mask_length - 1                  
+    for i in range(mask_length):
+        pred = sess.run(y, feed_dict={x: batch_xs[:,:783], y_: batch_ys, keep_prob: 1.0})
+
+        pixel_preds[:, i] = pred[:, pixel_idx]
+        pixel_idx += 1
+        pixel_gt[:, i] = batch_xs[:, pixel_idx, 0]
+        batch_xs[:, pixel_idx, 0] = pixel_preds[:, i]
+    
+    images_filename = root_dir + '/images/' + fn
+#     pi.dump( (ground_truth_images, pixel_preds, pixel_gt), open( "task_2.p", "wb" ) )
+    (ground_truth_images, pixel_preds, pixel_gt) = pi.load( open( "task_2.p", "rb" ) )
+    get_cross_entropy(ground_truth_images, pixel_preds, pixel_gt, images_filename)    
+        
+        
+def get_in_paintings(images, gt_images, num_in_paintings):
+    #generate 2 or 16 (all possible) in-paintings
+    images_ip = np.zeros( (images.shape[0], num_in_paintings, images.shape[1]) ) 
+    num_missing_pixels = int(np.log2(num_in_paintings))
+    missing_pixels = np.zeros( (gt_images.shape[0], num_missing_pixels), dtype=np.int)
     
     for i, img in enumerate(images):
-        mps = np.where(img<0)
+        missing_pixels[i,:] = np.where(img<0)
         
-        for s in range(nip):
+        for s in range(num_in_paintings):
             images_ip[i,s,:] = np.copy(img)
         
-        for mp in mps:
+        for mp in missing_pixels:
             images_ip[i,0,mp] = 0
             images_ip[i,1,mp] = 1
         
-        gt_at_mp[i] = gt_images[i,mps]
+    return images_ip, missing_pixels    
         
-    return images_ip, gt_at_mp    
         
-def calc_log_p(preds, gt_at_mp):
+def calc_log_p(preds, images_ip, gt_images, missing_pixels):
     
-    nip = preds.shape[1]
+    num_in_paintings = preds.shape[1]
     nimgs = preds.shape[0]
     npixels = preds.shape[2]
+    num_correct = 0
     
     for i in range(nimgs):
-        log_probs = np.zeros((nip))
-        for s in range(nip):
+        log_probs = np.zeros((num_in_paintings))
+        for s in range(num_in_paintings):
             for p in range(npixels):
                 log_probs[s] += np.log(preds[i,s,p])
 
         max_prob_idx = np.argmax(log_probs)
-        gt = gt_at_mp[i]
+        missing_pixel_in_most_probable_ip = images_ip[i, max_prob_idx, missing_pixels[0]]
+        missing_pixel_in_gt = gt_images[i, missing_pixels[0]]
+        
+        if(missing_pixel_in_most_probable_ip == missing_pixel_in_gt):
+            num_correct += 1
 
-def get_xent_for_mp(gt_idx, sample_idx):
-    
-    xent = gt*np.log()
-    
-                
-def in_painting(y, x, y_, keep_prob, sess):   
+    print('num correct=%g, %% correct=%g' %(num_correct, num_correct/nimgs))
+
+
+def in_painting(y, x, y_, keep_prob, sess, root_dir):   
     dataset = np.load(root_dir + '/one_pixel_inpainting.npy')    
 #     dataset = np.load(root_dir + '/2X2_pixels_inpainting.npy')
     
-    images    = dataset[0]
-    gt_images = dataset[1] 
+    images    = np.asarray(dataset[0])
+    gt_images = np.asarray(dataset[1]) 
     
-    nip = 2
+    num_in_paintings = 2
     
-    images_ip, gt_at_mp = get_in_paintings(images, gt_images, nip)
+    images_ip, missing_pixels = get_in_paintings(images, gt_images, num_in_paintings)
     
     images_ip = np.delete(images_ip, images_ip.shape[2]-1, 2) #remove last pixel
-            
     
     images_ip_rs = np.reshape(images_ip, [images_ip.shape[0] * images_ip.shape[1], images_ip.shape[2]])
     images_ip_rs = np.expand_dims(images_ip_rs, axis=2)
@@ -395,9 +421,9 @@ def in_painting(y, x, y_, keep_prob, sess):
 
     preds_rs = tf.reshape(preds, images_ip.shape).eval()
     
-    calc_log_p(preds_rs, gt_at_mp)
+    calc_log_p(preds_rs, images_ip, gt_images, missing_pixels)
     
-    
+    exit()
     
     
     
