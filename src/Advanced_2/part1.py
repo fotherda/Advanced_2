@@ -3,7 +3,6 @@ from __future__ import division
 from __future__ import print_function
 
 import sys, os
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import numpy as np
 import pickle
 import logging
@@ -40,7 +39,7 @@ def zero_variable(shape):
     initial = tf.constant(0.0, shape=shape)
     return tf.Variable(initial)
   
-def build_network_task1(x, nrecurrent_units, cell, y_):
+def build_network_task1(x, nrecurrent_units, cell, y_, use_batch_norm):
     
 #     W_1 = weight_variable([1, nrecurrent_units])
 #     b_1 = bias_variable([nrecurrent_units]) 
@@ -59,7 +58,29 @@ def build_network_task1(x, nrecurrent_units, cell, y_):
 
     W_2 = weight_variable([nrecurrent_units, 100])
     b_2 = bias_variable([100])   
-    h_2 = tf.nn.relu(tf.matmul(last_rnn_output, W_2) + b_2)    
+    lin_1 = tf.matmul(last_rnn_output, W_2) + b_2
+    
+    if use_batch_norm:
+        # Calculate batch mean and variance
+        batch_mean1, batch_var1 = tf.nn.moments(lin_1,[0])
+    
+        # Apply the initial batch normalizing transform
+        lin_1_hat = (lin_1 - batch_mean1) / tf.sqrt(batch_var1 + 1e-3)
+        
+        # Create two new parameters, scale and beta (shift)
+        scale1 = tf.Variable(tf.ones([100]))
+        beta1 = tf.Variable(tf.zeros([100]))
+        
+        # Scale and shift to obtain the final output of the batch normalization
+        # this value is fed into the activation function (here a sigmoid)
+        BN1 = scale1 * lin_1_hat + beta1
+        h_2 = tf.nn.relu(BN1)    
+    else:
+        h_2 = tf.nn.relu(lin_1)
+        
+#     W_2 = weight_variable([nrecurrent_units, 100])
+#     b_2 = bias_variable([100])   
+#     h_2 = tf.nn.relu(tf.matmul(last_rnn_output, W_2) + b_2)    
     
     W_3 = weight_variable([100, 10])
     b_3 = bias_variable([10])
@@ -178,22 +199,22 @@ class Parser():
 
 def run_part1_models(FLAGS):
     print('Tensorflow version: ', tf.VERSION)
-    print('PYTHON_PATH: ',sys.path)
+    print('PYTHONPATH: ',sys.path)
     print('model: ', FLAGS.model )
     root_dir = os.getcwd()
-#     root_dir = 'C:/Users/Dave/Documents/GI13-Advanced/Assignment2';
     summaries_dir = root_dir + '/Summaries';
     fn = ''
 
     
-    ########## Hyperparameters #################
-    max_num_epochs = 200
+############## Hyperparameters ################################################
+    max_num_epochs = 20000
     dropout_val = 0.5
-    learning_rate_val = 3e-5
+    learning_rate_val = float(FLAGS.lr)
+    use_batch_norm = FLAGS.bn
     
-    decay = learning_rate_val / 2e4
+    decay = learning_rate_val / 2e3
     use_peepholes = False; peep_str='' #only for LSTM
-    BATCH_SIZE = 32
+    BATCH_SIZE = 64
     num_train_examples = 0
     
     
@@ -218,7 +239,7 @@ def run_part1_models(FLAGS):
     if ps._task=='P1':
         x = tf.placeholder(tf.float32, [None, image_size, 1], name='x')
         y_ = tf.placeholder(tf.int32, [None], name='y_')
-        y, cross_entropy = build_network_task1(x, ps._num_units, cell, y_ ) 
+        y, cross_entropy = build_network_task1(x, ps._num_units, cell, y_, use_batch_norm ) 
     elif ps._task=='P2':
         x = tf.placeholder(tf.float32, [None, image_size-1, 1], name='x')
         y_ = tf.placeholder(tf.int32, [None, image_size-1], name='y_')
@@ -240,32 +261,26 @@ def run_part1_models(FLAGS):
     tf.summary.scalar('learning_rate', learning_rate)
     tf.summary.scalar('CrossEntropy', cross_entropy)
     path_arr = [FLAGS.model, "drop{:.1f}".format(dropout_val), peep_str, 'bs' + str(BATCH_SIZE),
-                "lr{:.2g}".format(learning_rate_val), "nt{:d}".format(num_train_examples)]
+                "lr{:.2g}".format(learning_rate_val)]
+    if use_batch_norm:
+        path_arr.append('bn')
 
 #     show_all_variables()
     db = DataBatcher(X_train, y_train)
 
             
     with tf.Session() as sess:  
-        # init operation
         tf.global_variables_initializer().run()    
-        start_epoch = 0
                        
-        if FLAGS.use_saved: #Restore saved model   
-#             fn = 'P2_1x032_G_drop0.5__bs32_lr0.005_nt0_38'; max_num_epochs=0
-#     fn = 'P2_1x064_G_drop0.5__bs32_lr0.005_nt0_32'; max_num_epochs=0  
-#             fn = 'P1_1x032_G_drop0.5__bs32_lr0.001_nt0_32'; max_num_epochs=0
-#             fn = 'P1_1x32_L_drop0.5__bs128_48'; max_num_epochs=0
-            fn = 'P1_3x032_L_drop0.5__bs32_lr2e-05_nt0_80'; start_epoch=81
-#             fn = 'P1_1x128_L_drop0.5__bs32_lr5e-06_nt0_18'; start_epoch=19  
-#             fn = 'P1_1x032_L_drop0.5__bs32_lr2e-05_nt0_54'; start_epoch=55
+        if FLAGS.sm is not None: #Restore saved model   
+            fn='P1_1x128_L_drop0.5__bs64_lr2e-06_nt0_47'
+            fn=FLAGS.sm
 
             model_file_name = root_dir + '/model/' + fn + '.ckpt'    
-#             model_file_name = FLAGS.saved_model_dir + '/' + FLAGS.model + '.ckpt'    
             saver2restore = tf.train.Saver(write_version=1)
             saver2restore.restore(sess, model_file_name)
             
-#         else: #Train new model
+        if not FLAGS.test: #Train new model
             # Merge all the summaries and write them out to file
             merged = tf.summary.merge_all()
             
@@ -278,14 +293,16 @@ def run_part1_models(FLAGS):
             lrs = LearningRateScheduler(decay)
             ntrain = X_train.shape[0]
 
+            print('Starting Training.........')
+            
             # Train
-            for epoch in range(start_epoch, max_num_epochs):
+            for epoch in range(max_num_epochs):
                 start = timer()
            
                 for i in range(ntrain // BATCH_SIZE):
                     learning_rate_val = lrs.get_learning_rate(epoch, learning_rate_val)
                     batch_xs, batch_ys = db.next_batch(BATCH_SIZE)
-                    _, pred = sess.run([train_step,y], feed_dict={x: batch_xs, y_: batch_ys, 
+                    sess.run(train_step, feed_dict={x: batch_xs, y_: batch_ys, 
                                                     learning_rate: learning_rate_val, keep_prob: dropout_val})
                 end = timer()
              
@@ -294,12 +311,12 @@ def run_part1_models(FLAGS):
                     if ps._task=='P1':
                         train_accuracy, train_loss, train_summary = sess.run([accuracy, cross_entropy, merged], feed_dict={x: X_train[:5000], y_: y_train[:5000], learning_rate: learning_rate_val, keep_prob: 1.0})                                      
                         test_accuracy, test_loss, test_summary = sess.run([accuracy, cross_entropy, merged], feed_dict={x: X_test, y_: y_test, learning_rate: learning_rate_val, keep_prob: 1.0})
-                        print("\nepoch %d, tr:te accuracy %g : %g loss %g : %g lr %g et %s" % (epoch, train_accuracy, test_accuracy, train_loss, test_loss, learning_rate_val, str(datetime.timedelta(seconds=end-start))))
+                        print("epoch %d, tr:te accuracy %g : %g loss %g : %g lr %g et %s" % (epoch, train_accuracy, test_accuracy, train_loss, test_loss, learning_rate_val, str(datetime.timedelta(seconds=end-start))))
                                    
                     elif ps._task=='P2':
                         train_loss, train_summary = sess.run([cross_entropy, merged], feed_dict={x: X_train[:1000,:783], y_: y_train[:1000], learning_rate: learning_rate_val, keep_prob: 1.0})                                      
                         test_loss, test_summary = sess.run([cross_entropy, merged], feed_dict={x: X_test[:,:783], y_: y_test, learning_rate: learning_rate_val, keep_prob: 1.0})
-                        print("\nepoch %d, loss %g : %g lr %g et %s" % (epoch, train_loss, test_loss, learning_rate_val, str(datetime.timedelta(seconds=end-start))))
+                        print("epoch %d, loss %g : %g lr %g et %s" % (epoch, train_loss, test_loss, learning_rate_val, str(datetime.timedelta(seconds=end-start))))
                                    
                     if np.isnan(train_loss) or np.isnan(test_loss):
                         exit()
