@@ -167,9 +167,9 @@ def import_data(FLAGS, num_train_examples):
         npixels = X_train_bin.shape[1]
         X_train = X_train_bin.astype(int)
         X_test = X_test_bin.astype(int)
-        if not FLAGS.use_saved or False:
-            X_train = np.delete(X_train, npixels-1, 1) #remove last pixel
-            X_test = np.delete(X_test, npixels-1, 1)   
+#         if not FLAGS.use_saved or False:
+#             X_train = np.delete(X_train, npixels-1, 1) #remove last pixel
+#             X_test = np.delete(X_test, npixels-1, 1)   
         X_train = np.expand_dims(X_train, -1)
         X_test = np.expand_dims(X_test, -1)
         
@@ -266,7 +266,11 @@ def run_part1_models(FLAGS):
         path_arr.append('bn')
 
 #     show_all_variables()
-    db = DataBatcher(X_train, y_train)
+
+    if ps._task=='P1':
+        db = DataBatcher(X_train, y_train)
+    elif ps._task=='P2':
+        db = DataBatcher(X_train[:,:783], y_train)
 
             
     with tf.Session() as sess:  
@@ -292,7 +296,7 @@ def run_part1_models(FLAGS):
             conv_tester = ConvergenceTester(0.0001, lookback_window=5, decreasing=True) #stop if converged to within 0.05%
             lrs = LearningRateScheduler(decay)
             ntrain = X_train.shape[0]
-
+#             print("\n".join([n.name for n in tf.get_default_graph().as_graph_def().node]))
             print('Starting Training.........')
             
             # Train
