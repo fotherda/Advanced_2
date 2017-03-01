@@ -214,7 +214,7 @@ def run_part1_models(FLAGS):
     
     decay = learning_rate_val / 2e3
     use_peepholes = False; peep_str='' #only for LSTM
-    BATCH_SIZE = 64
+    BATCH_SIZE = 512
     num_train_examples = 0
     
     
