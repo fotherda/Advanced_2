@@ -1,0 +1,25 @@
+
+
+Task1:
+
+To run the LSTM models use the following cmd line arguments:
+--model=P1_1x032_L -eval
+--model=P1_1x064_L -eval -bn
+--model=P1_1x128_L -eval -bn
+--model=P1_3x032_L -eval -bn
+
+To run the GRU models use the following cmd line arguments:
+--model=P1_1x032_G -eval -bn
+--model=P1_1x064_G -eval -bn
+--model=P1_1x128_G -eval -bn
+--model=P1_3x032_G -eval -bn
+
+
+Task2:
+
+To run the GRU models use the following cmd line arguments:
+--model=P2_1x032_G -eval -bn
+--model=P2_1x064_G -eval -bn
+--model=P2_1x128_G -eval -bn
+--model=P2_3x032_G -eval -bn
+

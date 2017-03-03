@@ -214,7 +214,7 @@ def run_part1_models(FLAGS):
     
     decay = learning_rate_val / 2e3
     use_peepholes = False; peep_str='' #only for LSTM
-    BATCH_SIZE = 512
+    BATCH_SIZE = 32
     num_train_examples = 0
     
     
@@ -276,15 +276,21 @@ def run_part1_models(FLAGS):
     with tf.Session() as sess:  
         tf.global_variables_initializer().run()    
                        
-        if FLAGS.sm is not None: #Restore saved model   
-            fn='P1_1x128_L_drop0.5__bs64_lr2e-06_nt0_47'
-            fn=FLAGS.sm
+        if FLAGS.sm is not None or FLAGS.eval: #Restore saved model   
+#             fn='P1_1x128_L_drop0.5__bs64_lr2e-06_nt0_47'
+            if FLAGS.sm is not None:
+                fn=FLAGS.sm
+            else:
+                fn= FLAGS.model
+#             print("\n".join([n.name for n in tf.get_default_graph().as_graph_def().node]))
 
-            model_file_name = root_dir + '/model/' + fn + '.ckpt'    
+#             model_file_name = root_dir + '/models/' + fn + '.ckpt'    
+            model_file_name = root_dir + '/final_models/' + fn + '.ckpt'  
+            print('loading model from: ' + model_file_name)  
             saver2restore = tf.train.Saver(write_version=1)
             saver2restore.restore(sess, model_file_name)
             
-        if not FLAGS.test: #Train new model
+        if not FLAGS.eval: #Train new model
             # Merge all the summaries and write them out to file
             merged = tf.summary.merge_all()
             
@@ -296,7 +302,6 @@ def run_part1_models(FLAGS):
             conv_tester = ConvergenceTester(0.0001, lookback_window=5, decreasing=True) #stop if converged to within 0.05%
             lrs = LearningRateScheduler(decay)
             ntrain = X_train.shape[0]
-#             print("\n".join([n.name for n in tf.get_default_graph().as_graph_def().node]))
             print('Starting Training.........')
             
             # Train
@@ -337,14 +342,31 @@ def run_part1_models(FLAGS):
                 save_model(sess, model_file_name, root_dir)
 #             exit()
             
-        #print final results        
-#         train_loss, train_accuracy = sess.run([cross_entropy, accuracy], feed_dict={x: X_train, y_: y_train, keep_prob: 1.0})                                      
-#         test_loss, test_accuracy = sess.run([cross_entropy, accuracy], feed_dict={x: X_test, y_: y_test, keep_prob: 1.0})                                      
-#         print("\ntrain loss %.6f train accuracy %.6f" % (train_loss, train_accuracy))
-#         print("\ntest loss %.6f test accuracy %.6f" % (test_loss, test_accuracy))
-#         exit()
+        if False:
+            #print final results        
+            nsplits = 10
+            n = int(X_train.shape[0] / nsplits)
+            train_losses = np.zeros((nsplits))
+            if ps._task=='P1':
+                train_accuracies = np.zeros((nsplits))
+                for i in range(nsplits):
+                    start = i * n
+                    end = (i+1) * n
+                    train_losses[i], train_accuracies[i] = sess.run([cross_entropy, accuracy], feed_dict={x: X_train[start:end], y_: y_train[start:end], keep_prob: 1.0})                                      
+                test_loss, test_accuracy = sess.run([cross_entropy, accuracy], feed_dict={x: X_test, y_: y_test, keep_prob: 1.0})                                      
+                print("\ntrain loss %.6f train accuracy %.6f" % (np.mean(train_losses), np.mean(train_accuracies)))
+                print("\ntest loss %.6f test accuracy %.6f" % (test_loss, test_accuracy))
+            elif ps._task=='P2':
+                for i in range(nsplits):
+                    start = i * n
+                    end = (i+1) * n
+                    train_losses[i] = sess.run(cross_entropy, feed_dict={x: X_train[start:end,:783], y_: y_train[start:end], keep_prob: 1.0})                                      
+                test_loss = sess.run(cross_entropy, feed_dict={x: X_test[:,:783], y_: y_test, keep_prob: 1.0})                                      
+                print("\ntrain loss %.6f" % np.mean(train_losses))
+                print("\ntest loss %.6f" % (test_loss))
+    #         exit()
 
-#         task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root_dir)
+        task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root_dir)
 
         # Task 3
 #         in_painting(y, x, y_, keep_prob, sess, root_dir)
@@ -357,7 +379,7 @@ def task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root
 #         print("\ntrain loss %g" % (train_loss))
 #         print("\ntest loss %g" % (test_loss))
                 
-    nsamples = 10
+    nsamples = 2
     mask_length = 300
     db2 = DataBatcher(X_test, y_test)
     batch_xs, batch_ys = db2.next_batch(nsamples)
@@ -374,10 +396,13 @@ def task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root
         pixel_gt[:, i] = batch_xs[:, pixel_idx, 0]
         batch_xs[:, pixel_idx, 0] = pixel_preds[:, i]
     
-    images_filename = root_dir + '/images/' + fn
-#     pi.dump( (ground_truth_images, pixel_preds, pixel_gt), open( "task_2.p", "wb" ) )
-    (ground_truth_images, pixel_preds, pixel_gt) = pi.load( open( "task_2.p", "rb" ) )
-    get_cross_entropy(ground_truth_images, pixel_preds, pixel_gt, images_filename)    
+    
+    inpaintings_data__filename = root_dir + '/inpaint_data/' + fn + '.p'
+ed models    pi.dump( (ground_truth_images, pixel_preds, pixel_gt), open( inpaintings_data__filename, "wb" ) )
+#     (ground_truth_images, pixel_preds, pixel_gt) = pi.load( open( "task_2.p", "rb" ) )
+    
+    saved_images_filename = root_dir + '/images/' + fn
+    get_cross_entropy(ground_truth_images, pixel_preds, pixel_gt, saved_images_filename)    
         
         
 def get_in_paintings(images, gt_images, num_in_paintings):

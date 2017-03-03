@@ -29,7 +29,7 @@ if __name__ == '__main__':
                         help='Directory where trained models are saved')
     parser.add_argument('-lr', type=str, default='1e-4', help='learning rate')
     parser.add_argument('-sm', type=str, default=None, help='saved model to evaluate')
-    parser.add_argument('-test', action='store_true', help='just test with saved model')
+    parser.add_argument('-eval', action='store_true', help='just evaluate with saved model')
     parser.add_argument('-bn', action='store_true', help='use batch normalization')
     parser.add_argument('--model', type=str, default='P1_a', 
         help='which model to run, one of [P1_a, P1_b, P1_c, P1_d, P2_a, P2_b, P3_c, P4_d]')
