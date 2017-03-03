@@ -41,14 +41,13 @@ def add_sub_plot(fig, img, nimages, nsamples, sub_plot_idx):
 
 def show_in_paintings(samples, images, file_name):       
 
-    nimages = 10
+    nimages = 20
     image_idxs = np.random.randint(0, len(images), (nimages))
     nsamples = 5  
     w = h = 28
         
-#     plot_imgs = np.zeros( (h * len(image_idxs), w * (nsamples+1) ) )
-         
     fig = plt.figure()
+    fig.suptitle(file_name, fontsize=14, fontweight='bold')
     sub_plot_idx = 1
 
     for i, image_idx in enumerate(image_idxs):
@@ -60,20 +59,12 @@ def show_in_paintings(samples, images, file_name):
             new_image = images[image_idx]
             new_image[-300:] = samples[sample_idx, image_idx, :]
             rs = np.reshape(new_image, (w,h))
-#             x = (sample_idx+1)*w
-#             y = i*h
-#             plot_imgs[y:y+h, x:x+w] = rs
             sub_plot_idx = add_sub_plot(fig, rs, nimages, nsamples, sub_plot_idx)
     
-#     plt.gca().xaxis.set_major_locator(plt.NullLocator())
     plt.subplots_adjust(left=None, bottom=0.02, right=0.36, top=0.98, wspace=0.001, hspace=0.12)
     plt.show()
-    plt.savefig('test.png')
+    plt.savefig(file_name)
         
-    combined_images = imresize(plot_imgs,3.0)
-    toimage( combined_images ).show()
-    imsave( file_name + '.png', combined_images )
-    
 def get_cross_entropy(images, model_probs, gt, file_name):
     
     nimages = model_probs.shape[0] #100
@@ -97,7 +88,7 @@ def get_cross_entropy(images, model_probs, gt, file_name):
                 xent_ip[i,k,j] -= samples[k,i,j] * np.log(model_probs[i,j]) + \
                                         (1-samples[k,i,j]) * np.log(1-model_probs[i,j])
                                
-    
+    i=1
     print(i, '-step ground truth Xent', np.mean(xent_gt[:,:i]))
     print(i, '-step in-painting Xent', np.mean(xent_ip[:,0,:i])) #don't average across samples for some reason
     

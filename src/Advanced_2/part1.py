@@ -215,7 +215,7 @@ def run_part1_models(FLAGS):
     decay = learning_rate_val / 2e3
     use_peepholes = False; peep_str='' #only for LSTM
     BATCH_SIZE = 32
-    num_train_examples = 0
+    num_train_examples = 5000
     
     
     image_size = 784
@@ -302,6 +302,11 @@ def run_part1_models(FLAGS):
             conv_tester = ConvergenceTester(0.0001, lookback_window=5, decreasing=True) #stop if converged to within 0.05%
             lrs = LearningRateScheduler(decay)
             ntrain = X_train.shape[0]
+            
+            nsplits = 10
+            n = int(X_train.shape[0] / nsplits)
+            test_losses = np.zeros((nsplits))
+    
             print('Starting Training.........')
             
             # Train
@@ -324,7 +329,13 @@ def run_part1_models(FLAGS):
                                    
                     elif ps._task=='P2':
                         train_loss, train_summary = sess.run([cross_entropy, merged], feed_dict={x: X_train[:1000,:783], y_: y_train[:1000], learning_rate: learning_rate_val, keep_prob: 1.0})                                      
-                        test_loss, test_summary = sess.run([cross_entropy, merged], feed_dict={x: X_test[:,:783], y_: y_test, learning_rate: learning_rate_val, keep_prob: 1.0})
+                        test_losses = np.zeros((nsplits))
+                        for i in range(nsplits):
+                            start = i * n
+                            end = (i+1) * n
+                            test_losses[i] = sess.run(cross_entropy, feed_dict={x: X_test[start:end,:783], y_: y_test[start:end], keep_prob: 1.0})
+                        test_loss = np.mean(test_losses)                              
+                        test_summary = sess.run(merged, feed_dict={x: X_test[:,:783], y_: y_test, learning_rate: learning_rate_val, keep_prob: 1.0})
                         print("epoch %d, loss %g : %g lr %g et %s" % (epoch, train_loss, test_loss, learning_rate_val, str(datetime.timedelta(seconds=end-start))))
                                    
                     if np.isnan(train_loss) or np.isnan(test_loss):
@@ -366,44 +377,53 @@ def run_part1_models(FLAGS):
                 print("\ntest loss %.6f" % (test_loss))
     #         exit()
 
-        task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root_dir)
+#         task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root_dir)
 
         # Task 3
-#         in_painting(y, x, y_, keep_prob, sess, root_dir)
+        task_3(y, x, y_, keep_prob, sess, root_dir)
 
     
         # Task 2: prediction
 def task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root_dir):
-#         train_loss = sess.run(cross_entropy, feed_dict={x: X_train, y_: y_train, keep_prob: 1.0})                                      
-#         test_loss = sess.run(cross_entropy, feed_dict={x: X_test, y_: y_test, keep_prob: 1.0})                                      
-#         print("\ntrain loss %g" % (train_loss))
-#         print("\ntest loss %g" % (test_loss))
-                
-    nsamples = 100
-    mask_length = 300
-    db2 = DataBatcher(X_test, y_test)
-    batch_xs, batch_ys = db2.next_batch(nsamples)
-    ground_truth_images = np.copy(batch_xs)
-                
-    pixel_preds = np.zeros((nsamples, mask_length), dtype='float32')            
-    pixel_gt = np.zeros((nsamples, mask_length), dtype='float32')            
-    pixel_idx = batch_xs.shape[1] - mask_length - 1                  
-    for i in range(mask_length):
-        pred = sess.run(y, feed_dict={x: batch_xs[:,:783], y_: batch_ys, keep_prob: 1.0})
 
-        pixel_preds[:, i] = pred[:, pixel_idx]
-        pixel_idx += 1
-        pixel_gt[:, i] = batch_xs[:, pixel_idx, 0]
-        batch_xs[:, pixel_idx, 0] = pixel_preds[:, i]
-    
-    
     inpaintings_data__filename = root_dir + '/inpaint_data/' + fn + '.p'
-    pi.dump( (ground_truth_images, pixel_preds, pixel_gt), open( inpaintings_data__filename, "wb" ) )
-#     (ground_truth_images, pixel_preds, pixel_gt) = pi.load( open( "task_2.p", "rb" ) )
-    exit()
+                
+    calc_inpaintings = False
+    if calc_inpaintings:
+        nsamples = 100
+        mask_length = 300
+        db2 = DataBatcher(X_test, y_test)
+        batch_xs, batch_ys = db2.next_batch(nsamples)
+        ground_truth_images = np.copy(batch_xs)
+                    
+        pixel_preds = np.zeros((nsamples, mask_length), dtype='float32')            
+        pixel_gt = np.zeros((nsamples, mask_length), dtype='float32')            
+        pixel_idx = batch_xs.shape[1] - mask_length - 1                  
+        for i in range(mask_length):
+            pred = sess.run(y, feed_dict={x: batch_xs[:,:783], y_: batch_ys, keep_prob: 1.0})
+    
+            pixel_preds[:, i] = pred[:, pixel_idx]
+            pixel_idx += 1
+            pixel_gt[:, i] = batch_xs[:, pixel_idx, 0]
+            batch_xs[:, pixel_idx, 0] = pixel_preds[:, i]
+        
+        pi.dump( (ground_truth_images, pixel_preds, pixel_gt), open( inpaintings_data__filename, "wb" ) )
+    else:
+        (ground_truth_images, pixel_preds, pixel_gt) = pi.load( open( inpaintings_data__filename, "rb" ) )
+
     saved_images_filename = root_dir + '/images/' + fn
     get_cross_entropy(ground_truth_images, pixel_preds, pixel_gt, saved_images_filename)    
         
+        
+def generate_possible_ips(m, missing_pixels, images_ip, i, num_missing_pixels):
+
+
+    mp = missing_pixels[m]
+    for a in range(2):
+        images_ip[i,a,mp] = a
+        if m < num_missing_pixels:
+            generate_possible_ips(m+1, missing_pixels, images_ip, i)
+            
         
 def get_in_paintings(images, gt_images, num_in_paintings):
     #generate 2 or 16 (all possible) in-paintings
@@ -411,50 +431,69 @@ def get_in_paintings(images, gt_images, num_in_paintings):
     num_missing_pixels = int(np.log2(num_in_paintings))
     missing_pixels = np.zeros( (gt_images.shape[0], num_missing_pixels), dtype=np.int)
     
+    #build LUT to hold all possible inpaintings
+    lut = np.zeros((num_in_paintings, num_missing_pixels))
+    for s in range(num_in_paintings):
+        for m in range(num_missing_pixels):
+            lut[s, m] = min(1, s & 2**m) 
+    
     for i, img in enumerate(images):
-        missing_pixels[i,:] = np.where(img<0)
+        mps = np.where(img<0) #find the missing pixels in this image
+        missing_pixels[i,:] = mps[0] #find the missing pixels in this image
         
         for s in range(num_in_paintings):
-            images_ip[i,s,:] = np.copy(img)
-        
-        for mp in missing_pixels:
-            images_ip[i,0,mp] = 0
-            images_ip[i,1,mp] = 1
+            images_ip[i,s,:] = np.copy(img) #make 1 copy for each possible in-painting
+            
+            for m, mp_idx in enumerate(missing_pixels[i,:]): 
+                images_ip[i,s,mp_idx] = lut[s, m]
         
     return images_ip, missing_pixels    
         
         
 def calc_log_p(preds, images_ip, gt_images, missing_pixels):
     
-    num_in_paintings = preds.shape[1]
-    nimgs = preds.shape[0]
-    npixels = preds.shape[2]
+    num_in_paintings = preds.shape[1] #2 or 16
+    num_missing_pixels = np.log2(num_in_paintings)
+    nimgs = preds.shape[0]              #1000
+    npixels = preds.shape[2]            #783
     num_correct = 0
+    
+    xent_gt = np.zeros((nimgs, npixels), dtype='float32')
+    xent_ip = np.zeros((nimgs, num_in_paintings, npixels), dtype='float32')
+
     
     for i in range(nimgs):
         log_probs = np.zeros((num_in_paintings))
         for s in range(num_in_paintings):
             for p in range(npixels):
-                log_probs[s] += np.log(preds[i,s,p])
+                log_prob = np.log(preds[i,s,p])
+                log_one_minus_prob = np.log(1 - preds[i,s,p])
+                log_probs[s] += log_prob 
+                
+                xent_gt[i,p] -= gt_images[i,p] * log_prob + \
+                                    (1-gt_images[i,p]) * log_one_minus_prob
+                xent_ip[i,s,p] -= images_ip[i,s,p] * log_prob + \
+                                            (1-images_ip[i,s,p]) * log_one_minus_prob
 
         max_prob_idx = np.argmax(log_probs)
-        missing_pixel_in_most_probable_ip = images_ip[i, max_prob_idx, missing_pixels[0]]
-        missing_pixel_in_gt = gt_images[i, missing_pixels[0]]
+        missing_pixels_in_most_probable_ip = images_ip[i, max_prob_idx, missing_pixels[i]]
+        missing_pixels_in_gt = gt_images[i, missing_pixels[1]]
         
-        if(missing_pixel_in_most_probable_ip == missing_pixel_in_gt):
-            num_correct += 1
+        for mp_ip, mp_gt in zip(missing_pixels_in_most_probable_ip, missing_pixels_in_gt):
 
-    print('num correct=%g, %% correct=%g' %(num_correct, num_correct/nimgs))
+            if(mp_ip == mp_gt):
+                num_correct += 1
 
 
-def in_painting(y, x, y_, keep_prob, sess, root_dir):   
-    dataset = np.load(root_dir + '/one_pixel_inpainting.npy')    
-#     dataset = np.load(root_dir + '/2X2_pixels_inpainting.npy')
+    print('num correct=%g, %% correct=%g' %(num_correct, num_correct/(nimgs*num_missing_pixels)))
+
+
+def task_3(y, x, y_, keep_prob, sess, root_dir):   
+#     dataset = np.load(root_dir + '/one_pixel_inpainting.npy');num_in_paintings = 2    
+    dataset = np.load(root_dir + '/2X2_pixels_inpainting.npy');num_in_paintings = 16
     
     images    = np.asarray(dataset[0])
     gt_images = np.asarray(dataset[1]) 
-    
-    num_in_paintings = 2
     
     images_ip, missing_pixels = get_in_paintings(images, gt_images, num_in_paintings)
     
