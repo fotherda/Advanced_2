@@ -379,7 +379,7 @@ def task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root
 #         print("\ntrain loss %g" % (train_loss))
 #         print("\ntest loss %g" % (test_loss))
                 
-    nsamples = 2
+    nsamples = 100
     mask_length = 300
     db2 = DataBatcher(X_test, y_test)
     batch_xs, batch_ys = db2.next_batch(nsamples)
@@ -398,9 +398,9 @@ def task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root
     
     
     inpaintings_data__filename = root_dir + '/inpaint_data/' + fn + '.p'
-ed models    pi.dump( (ground_truth_images, pixel_preds, pixel_gt), open( inpaintings_data__filename, "wb" ) )
+    pi.dump( (ground_truth_images, pixel_preds, pixel_gt), open( inpaintings_data__filename, "wb" ) )
 #     (ground_truth_images, pixel_preds, pixel_gt) = pi.load( open( "task_2.p", "rb" ) )
-    
+    exit()
     saved_images_filename = root_dir + '/images/' + fn
     get_cross_entropy(ground_truth_images, pixel_preds, pixel_gt, saved_images_filename)    
         
