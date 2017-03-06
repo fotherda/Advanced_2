@@ -212,10 +212,10 @@ def run_part1_models(FLAGS):
     learning_rate_val = float(FLAGS.lr)
     use_batch_norm = FLAGS.bn
     
-    decay = learning_rate_val / 2e3
+    decay = learning_rate_val / 2e4
     use_peepholes = False; peep_str='' #only for LSTM
-    BATCH_SIZE = 32
-    num_train_examples = 5000
+    BATCH_SIZE = 64
+    num_train_examples = 0
     
     
     image_size = 784
@@ -284,7 +284,7 @@ def run_part1_models(FLAGS):
                 fn= FLAGS.model
 #             print("\n".join([n.name for n in tf.get_default_graph().as_graph_def().node]))
 
-#             model_file_name = root_dir + '/models/' + fn + '.ckpt'    
+#             model_file_name = root_dir + '/model/' + fn + '.ckpt'    
             model_file_name = root_dir + '/final_models/' + fn + '.ckpt'  
             print('loading model from: ' + model_file_name)  
             saver2restore = tf.train.Saver(write_version=1)
@@ -303,10 +303,7 @@ def run_part1_models(FLAGS):
             lrs = LearningRateScheduler(decay)
             ntrain = X_train.shape[0]
             
-            nsplits = 10
-            n = int(X_train.shape[0] / nsplits)
-            test_losses = np.zeros((nsplits))
-    
+            
             print('Starting Training.........')
             
             # Train
@@ -329,11 +326,14 @@ def run_part1_models(FLAGS):
                                    
                     elif ps._task=='P2':
                         train_loss, train_summary = sess.run([cross_entropy, merged], feed_dict={x: X_train[:1000,:783], y_: y_train[:1000], learning_rate: learning_rate_val, keep_prob: 1.0})                                      
+
+                        nsplits = 20
+                        n = int(X_test.shape[0] / nsplits)
                         test_losses = np.zeros((nsplits))
                         for i in range(nsplits):
-                            start = i * n
-                            end = (i+1) * n
-                            test_losses[i] = sess.run(cross_entropy, feed_dict={x: X_test[start:end,:783], y_: y_test[start:end], keep_prob: 1.0})
+                            s = i * n
+                            e = (i+1) * n
+                            test_losses[i] = sess.run(cross_entropy, feed_dict={x: X_test[s:e,:783], y_: y_test[s:e], keep_prob: 1.0})
                         test_loss = np.mean(test_losses)                              
                         test_summary = sess.run(merged, feed_dict={x: X_test[:,:783], y_: y_test, learning_rate: learning_rate_val, keep_prob: 1.0})
                         print("epoch %d, loss %g : %g lr %g et %s" % (epoch, train_loss, test_loss, learning_rate_val, str(datetime.timedelta(seconds=end-start))))
@@ -353,7 +353,7 @@ def run_part1_models(FLAGS):
                 save_model(sess, model_file_name, root_dir)
 #             exit()
             
-        if False:
+        if FLAGS.eval and False:
             #print final results        
             nsplits = 10
             n = int(X_train.shape[0] / nsplits)
@@ -375,12 +375,12 @@ def run_part1_models(FLAGS):
                 test_loss = sess.run(cross_entropy, feed_dict={x: X_test[:,:783], y_: y_test, keep_prob: 1.0})                                      
                 print("\ntrain loss %.6f" % np.mean(train_losses))
                 print("\ntest loss %.6f" % (test_loss))
-    #         exit()
+            exit()
 
-#         task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root_dir)
+        task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root_dir)
 
         # Task 3
-        task_3(y, x, y_, keep_prob, sess, root_dir)
+#         task_3(y, x, y_, keep_prob, sess, root_dir)
 
     
         # Task 2: prediction
@@ -388,35 +388,39 @@ def task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root
 
     inpaintings_data__filename = root_dir + '/inpaint_data/' + fn + '.p'
                 
-    calc_inpaintings = False
+    calc_inpaintings = True
     if calc_inpaintings:
         nsamples = 100
         mask_length = 300
         db2 = DataBatcher(X_test, y_test)
-        batch_xs, batch_ys = db2.next_batch(nsamples)
-        ground_truth_images = np.copy(batch_xs)
+        ground_truth_images, batch_ys = db2.next_batch(nsamples)
                     
         pixel_preds = np.zeros((nsamples, mask_length), dtype='float32')            
         pixel_gt = np.zeros((nsamples, mask_length), dtype='float32')            
-        pixel_idx = batch_xs.shape[1] - mask_length - 1                  
+        pixel_idx = ground_truth_images.shape[1] - mask_length - 1                  
         for i in range(mask_length):
-            pred = sess.run(y, feed_dict={x: batch_xs[:,:783], y_: batch_ys, keep_prob: 1.0})
+            pred = sess.run(y, feed_dict={x: ground_truth_images[:,:783], y_: batch_ys, keep_prob: 1.0})
     
             pixel_preds[:, i] = pred[:, pixel_idx]
             pixel_idx += 1
-            pixel_gt[:, i] = batch_xs[:, pixel_idx, 0]
-            batch_xs[:, pixel_idx, 0] = pixel_preds[:, i]
+            pixel_gt[:, i] = ground_truth_images[:, pixel_idx, 0]
+#             ground_truth_images[:, pixel_idx, 0] = pixel_preds[:, i]
         
-        pi.dump( (ground_truth_images, pixel_preds, pixel_gt), open( inpaintings_data__filename, "wb" ) )
+        samples = generate_in_paintings(pixel_preds, 10) # 10 x 100 x 300
+
+        pi.dump( (ground_truth_images, pixel_preds, pixel_gt, samples), open( inpaintings_data__filename, "wb" ) )
+        exit()
     else:
-        (ground_truth_images, pixel_preds, pixel_gt) = pi.load( open( inpaintings_data__filename, "rb" ) )
+        (ground_truth_images, pixel_preds, pixel_gt, samples) = pi.load( open( inpaintings_data__filename, "rb" ) )
 
     saved_images_filename = root_dir + '/images/' + fn
-    get_cross_entropy(ground_truth_images, pixel_preds, pixel_gt, saved_images_filename)    
+    get_cross_entropy(samples, ground_truth_images, pixel_preds, pixel_gt, saved_images_filename)    
         
+def generate_in_paintings(model_probs, nsamples):
+    samples = np.random.uniform(size=(nsamples,model_probs.shape[0],model_probs.shape[1])) < model_probs
+    return samples.astype('float32')
         
 def generate_possible_ips(m, missing_pixels, images_ip, i, num_missing_pixels):
-
 
     mp = missing_pixels[m]
     for a in range(2):
