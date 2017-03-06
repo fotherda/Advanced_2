@@ -1,0 +1,70 @@
+
+PYTHONPATH=${PYTHONPATH}:/home/ubuntu/a2/Assignment1/Advanced_1/src:/home/ubuntu/a2/Advanced_2/src export PYTHONPATH
+nohup python3.4 -u src/Advanced_2/main_script.py --model=P1_1x032_L &
+git clone https://github.com/fotherda/Assignment1
+git clone https://github.com/fotherda/Advanced_2
+sudo chmod 777 a2
+lsblk
+sudo file -s /dev/xvdf
+sudo mkfs -t ext4 /dev/xvdf
+sudo mount /dev/xvdf a2
+
+
+32
+1 -step ground truth Xent 0.270613
+1 -step in-painting Xent 0.214481
+1 -step t-test: p= 0.572247163881
+10 -step ground truth Xent 0.224943
+10 -step in-painting Xent 0.206338
+10 -step t-test: p= 0.315085909226
+28 -step ground truth Xent 0.136455
+28 -step in-painting Xent 0.124768
+28 -step t-test: p= 0.192482491211
+300 -step ground truth Xent 0.0657864
+300 -step in-painting Xent 0.0689448
+300 -step t-test: p= 0.113903965612
+
+64
+1 -step ground truth Xent 0.127646
+1 -step in-painting Xent 0.102831
+1 -step t-test: p= 0.613384652103
+10 -step ground truth Xent 0.17269
+10 -step in-painting Xent 0.173894
+10 -step t-test: p= 0.941869267899
+28 -step ground truth Xent 0.106353
+28 -step in-painting Xent 0.108348
+28 -step t-test: p= 0.806237538726
+300 -step ground truth Xent 0.0598096
+300 -step in-painting Xent 0.060574
+300 -step t-test: p= 0.675972328639
+
+128
+1 -step ground truth Xent 0.164766
+1 -step in-painting Xent 0.0783737
+1 -step t-test: p= 0.089236861479
+10 -step ground truth Xent 0.185916
+10 -step in-painting Xent 0.175391
+10 -step t-test: p= 0.509631463181
+28 -step ground truth Xent 0.100544
+28 -step in-painting Xent 0.0957311
+28 -step t-test: p= 0.529516488811
+300 -step ground truth Xent 0.0587245
+300 -step in-painting Xent 0.0564018
+300 -step t-test: p= 0.184607696113
+
+
+
+
+3x32
+1 -step ground truth Xent 0.101139
+1 -step in-painting Xent 0.148701
+1 -step t-test: p= 0.437483842241
+10 -step ground truth Xent 0.169033
+10 -step in-painting Xent 0.180307
+10 -step t-test: p= 0.486575437321
+28 -step ground truth Xent 0.104144
+28 -step in-painting Xent 0.101253
+28 -step t-test: p= 0.70618764676
+300 -step ground truth Xent 0.0578831
+300 -step in-painting Xent 0.0553086
+300 -step t-test: p= 0.136712216685

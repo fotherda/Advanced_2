@@ -22,6 +22,8 @@ from Advanced_2.visualize import *
 from sklearn.metrics import confusion_matrix
 from tensorflow.python.ops import rnn
 from scipy.misc import toimage
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
 
 
 
@@ -114,10 +116,10 @@ def build_network_task2(x, nrecurrent_units, cell, y_):
     
     y = tf.nn.sigmoid(logits, name='sigmoid_outputs')
     target_float = tf.to_float(y_)
-    cross_entropy = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits, target_float))
+    cross_entropy_all = tf.nn.sigmoid_cross_entropy_with_logits(logits, target_float)
+    cross_entropy = tf.reduce_mean(cross_entropy_all)
     
     #don't scale the logits that will done in the loss function
-        
 #     cross_entropy = tf.reduce_mean(
 #         tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_, logits=logits))
 
@@ -167,17 +169,12 @@ def import_data(FLAGS, num_train_examples):
         npixels = X_train_bin.shape[1]
         X_train = X_train_bin.astype(int)
         X_test = X_test_bin.astype(int)
-#         if not FLAGS.use_saved or False:
-#             X_train = np.delete(X_train, npixels-1, 1) #remove last pixel
-#             X_test = np.delete(X_test, npixels-1, 1)   
         X_train = np.expand_dims(X_train, -1)
         X_test = np.expand_dims(X_test, -1)
         
     if num_train_examples > 0:
         X_train = X_train[:num_train_examples]
         y_train = y_train[:num_train_examples]    
-#         X_test = X_test[:num_train_examples]
-#         y_test = y_test[:num_train_examples]
 
 #     rs = np.reshape(mnist.train.images[0], (28,28))
 #     toimage(rs).show()
@@ -377,10 +374,9 @@ def run_part1_models(FLAGS):
                 print("\ntest loss %.6f" % (test_loss))
             exit()
 
-        task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root_dir)
+#         task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root_dir)
 
-        # Task 3
-#         task_3(y, x, y_, keep_prob, sess, root_dir)
+        task_3(y, x, y_, keep_prob, sess, root_dir, fn)
 
     
         # Task 2: prediction
@@ -388,7 +384,7 @@ def task_2(sess, x, y, y_, X_train, y_train, X_test, y_test, keep_prob, fn, root
 
     inpaintings_data__filename = root_dir + '/inpaint_data/' + fn + '.p'
                 
-    calc_inpaintings = True
+    calc_inpaintings = False
     if calc_inpaintings:
         nsamples = 100
         mask_length = 300
@@ -453,6 +449,17 @@ def get_in_paintings(images, gt_images, num_in_paintings):
         
     return images_ip, missing_pixels    
         
+def mean_xent_missing_pixels(mean_xent, missing_pixels):
+    xent = 0;
+    for mp in missing_pixels:
+        xent += mean_xent[mp]
+    return xent/len(missing_pixels)
+
+def idx_of_gt(images_ip, gt_image, num_in_paintings):
+    for s in range(num_in_paintings):
+        if np.array_equal(images_ip[s,:], gt_image):
+            return s
+    return None
         
 def calc_log_p(preds, images_ip, gt_images, missing_pixels):
     
@@ -464,53 +471,100 @@ def calc_log_p(preds, images_ip, gt_images, missing_pixels):
     
     xent_gt = np.zeros((nimgs, npixels), dtype='float32')
     xent_ip = np.zeros((nimgs, num_in_paintings, npixels), dtype='float32')
+    xent_ip_mp = np.zeros((nimgs, npixels), dtype='float32')
+#     xent_ip_corr = np.zeros((nimgs, npixels), dtype='float32')
 
     
-    for i in range(nimgs):
-        log_probs = np.zeros((num_in_paintings))
+    for i in range(int(nimgs/1)):
         for s in range(num_in_paintings):
             for p in range(npixels):
                 log_prob = np.log(preds[i,s,p])
                 log_one_minus_prob = np.log(1 - preds[i,s,p])
-                log_probs[s] += log_prob 
                 
-                xent_gt[i,p] -= gt_images[i,p] * log_prob + \
-                                    (1-gt_images[i,p]) * log_one_minus_prob
-                xent_ip[i,s,p] -= images_ip[i,s,p] * log_prob + \
-                                            (1-images_ip[i,s,p]) * log_one_minus_prob
+#                 xent_gt[i,p] -= gt_images[i,p+1] * log_prob + \
+#                                     (1-gt_images[i,p+1]) * log_one_minus_prob
+                xent_ip[i,s,p] -= images_ip[i,s,p+1] * log_prob + \
+                                            (1-images_ip[i,s,p+1]) * log_one_minus_prob
 
-        max_prob_idx = np.argmax(log_probs)
-        missing_pixels_in_most_probable_ip = images_ip[i, max_prob_idx, missing_pixels[i]]
-        missing_pixels_in_gt = gt_images[i, missing_pixels[1]]
+        mean_arr = np.mean(xent_ip[i,:,:], axis=1)
+        max_prob_idx = np.argmin( mean_arr )
         
-        for mp_ip, mp_gt in zip(missing_pixels_in_most_probable_ip, missing_pixels_in_gt):
+        missing_pixels_in_most_probable_ip = images_ip[i, max_prob_idx, missing_pixels[i]]
+        missing_pixels_in_gt = gt_images[i, missing_pixels[i]]
+        idx_gt = idx_of_gt(images_ip[i], gt_images[i], num_in_paintings)
 
+        for p in range(npixels):        
+            xent_ip_mp[i,p] = xent_ip[i,max_prob_idx,p]
+            xent_gt[i,p] = xent_ip[i,idx_gt,p]
+    
+        for mp_ip, mp_gt in zip(missing_pixels_in_most_probable_ip, missing_pixels_in_gt):
             if(mp_ip == mp_gt):
                 num_correct += 1
+                
+    mean_xent = np.mean(xent_gt, axis=0) 
+    mx_mp = mean_xent_missing_pixels(mean_xent, missing_pixels)
+    print('mean_xent_missing_pixels=%g' %(mx_mp))
+
+#     mean_xent = np.append(mean_xent, 0) 
+#     mean_xent = np.reshape(mean_xent, (28,28))
+#     plt.figimage(mean_xent)
+#     plt.show()
+#  
+#     fig = plt.figure()
+#     ax = fig.gca(projection='3d')
+#     X = range(28)
+#     Y = range(28)
+#     X, Y = np.meshgrid(X, Y)
+#     surf = ax.plot_surface(X, Y, mean_xent, cmap=cm.coolwarm,
+#                            linewidth=0, antialiased=False)
+#      
+#     # Add a color bar which maps values to colors.
+#     fig.colorbar(surf, shrink=0.5, aspect=5)
+#     ax.set_xlabel('horizontal pixel index')
+#     ax.set_ylabel('vertical pixel index')
+#     ax.set_zlabel('Cross entropy')
+#     plt.show()
+
+    print('num correct=%g, %%correct=%g' %(num_correct, num_correct/(nimgs*num_missing_pixels)))
+    print('xent_gt=%g, xent_ip_max_prob=%g' %(np.mean(xent_gt), np.mean(xent_ip_mp)))
 
 
-    print('num correct=%g, %% correct=%g' %(num_correct, num_correct/(nimgs*num_missing_pixels)))
+def task_3(y, x, y_, keep_prob, sess, root_dir, fn):   
 
+    num_missing_pixels = 4; #2 or 4
+    inpaintings_data__filename = root_dir + '/inpaint_data/' + fn + '_task3_' + str(num_missing_pixels) + '.p'
 
-def task_3(y, x, y_, keep_prob, sess, root_dir):   
-#     dataset = np.load(root_dir + '/one_pixel_inpainting.npy');num_in_paintings = 2    
-    dataset = np.load(root_dir + '/2X2_pixels_inpainting.npy');num_in_paintings = 16
-    
-    images    = np.asarray(dataset[0])
-    gt_images = np.asarray(dataset[1]) 
-    
-    images_ip, missing_pixels = get_in_paintings(images, gt_images, num_in_paintings)
-    
-    images_ip = np.delete(images_ip, images_ip.shape[2]-1, 2) #remove last pixel
-    
-    images_ip_rs = np.reshape(images_ip, [images_ip.shape[0] * images_ip.shape[1], images_ip.shape[2]])
-    images_ip_rs = np.expand_dims(images_ip_rs, axis=2)
+    calc_inpaintings = True
+    if calc_inpaintings:
+        if num_missing_pixels==2:
+            dataset = np.load(root_dir + '/one_pixel_inpainting.npy');num_in_paintings = 2    
+        elif num_missing_pixels==4:
+            dataset = np.load(root_dir + '/2X2_pixels_inpainting.npy');num_in_paintings = 16
         
-    preds = sess.run(y, feed_dict={x: images_ip_rs, keep_prob: 1.0})
-
-    preds_rs = tf.reshape(preds, images_ip.shape).eval()
+        images    = np.asarray(dataset[0])
+        gt_images = np.asarray(dataset[1]) 
+        
+        images_ip_784, missing_pixels = get_in_paintings(images, gt_images, num_in_paintings)
+        
+        images_ip = np.delete(images_ip_784, images_ip_784.shape[2]-1, 2) #remove last pixel
+        
+#         imshow = np.append(images_ip[0,0,:], 0)
+#         rs = np.reshape(imshow, (28,28))
+#         toimage(rs).show()
+        
+        images_ip_rs = np.reshape(images_ip, [images_ip.shape[0] * images_ip.shape[1], images_ip.shape[2]])
+        images_ip_rs = np.expand_dims(images_ip_rs, axis=2)
+            
+        preds = sess.run(y, feed_dict={x: images_ip_rs, keep_prob: 1.0})
     
-    calc_log_p(preds_rs, images_ip, gt_images, missing_pixels)
+        preds_rs = tf.reshape(preds, images_ip.shape).eval()
+        
+        pi.dump( (preds_rs, images_ip_784, gt_images, missing_pixels), open( inpaintings_data__filename, "wb" ) )
+        exit()
+    else:
+        (preds_rs, images_ip_784, gt_images, missing_pixels) = pi.load( open( inpaintings_data__filename, "rb" ) )
+    
+    calc_log_p(preds_rs, images_ip_784, gt_images, missing_pixels)
     
     exit()
     

@@ -75,13 +75,22 @@ def get_fraction_of_ip(ip, nsteps):
             
     return ip_frac  
 
+
+LUT_32 = {'s10': 1, 'f10': 4, 'v10': 7,
+          's28': 7, 'f28': 23, 'v28': 13,
+          's300': 8, 'f300': 4, 'v300': 1}
+
 LUT_64 = {'s10': 44, 'f10': 36, 'v10': 40,
           's28': 10, 'f28': 40, 'v28': 15,
           's300': 9, 'f300': 5, 'v300': 6}
 
-LUT_32 = {'s10': 41, 'f10': 30, 'v10': 0,
-          's28': 36, 'f28': 58, 'v28': 28,
-          's300': 87, 'f300': 43, 'v300': 15}
+LUT_128 = {'s10': 10, 'f10': 16, 'v10': 1,
+          's28': 26, 'f28': 36, 'v28': 1,
+          's300': 0, 'f300': 7, 'v300': 4}
+
+LUT_3x32 = {'s10': 3, 'f10': 13, 'v10': 7,
+           's28': 3, 'f28': 6, 'v28': 0,
+           's300': 4, 'f300': 7, 'v300': 5}
 
 def show_report_in_paintings(samples, images, file_name, lut):       
 
@@ -156,11 +165,11 @@ def get_cross_entropy(samples, images, model_probs, gt, file_name):
 #     samples = generate_in_paintings(model_probs, nsamples) # 10 x 100 x 300
     images = np.squeeze(images, axis=2)
     
-#     show_report_in_paintings(samples, images, file_name, LUT_32)
-    
-    nsteps = 10
-    for i in range(10):
-        show_in_paintings(samples, images, file_name, i, nsteps)
+#     show_report_in_paintings(samples, images, file_name, LUT_3x32)
+#     
+#     nsteps = 300
+#     for i in range(10):
+#         show_in_paintings(samples, images, file_name, i, nsteps)
     
     for i in range(nimages):
         for j in range(npixels):
@@ -173,8 +182,8 @@ def get_cross_entropy(samples, images, model_probs, gt, file_name):
     i=1
     print(i, '-step ground truth Xent', np.mean(xent_gt[:,:i]))
     print(i, '-step in-painting Xent', np.mean(xent_ip[:,0,:i])) #don't average across samples for some reason
-    t_stat, p_value = ttest_ind(xent_gt[:,:i], xent_ip[:,0,:i], axis=None)
     print(i, '-step t-test: p=', p_value)
+    t_stat, p_value = ttest_ind(xent_gt[:,:i], xent_ip[:,0,:i], axis=None)
     
     for i in [10,28,300]:
         print(i, '-step ground truth Xent', np.mean(xent_gt[:,:i]))
