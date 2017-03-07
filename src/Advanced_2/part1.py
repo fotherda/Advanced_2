@@ -7,8 +7,7 @@ import numpy as np
 import logging
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 import tensorflow as tf
-import matplotlib.pyplot as plt
-import datetime, time
+import datetime#, time
 import pickle as pi
 
 from timeit import default_timer as timer
@@ -17,13 +16,8 @@ from tensorflow.examples.tutorials.mnist import input_data
 from Advanced_1.convergenceTester import ConvergenceTester
 from Advanced_1.learningRateScheduler import LearningRateScheduler
 from Advanced_1.dataBatcher import DataBatcher
-from Advanced_2.visualize import *
-from tensorflow.python.ops import rnn
+from scipy.stats import ttest_ind
 from scipy.misc import toimage
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import cm
-
-
 
 
 
@@ -33,10 +27,6 @@ def weight_variable(shape):
 
 def bias_variable(shape):
     initial = tf.constant(0.001, shape=shape)
-    return tf.Variable(initial)
-  
-def zero_variable(shape):
-    initial = tf.constant(0.0, shape=shape)
     return tf.Variable(initial)
   
 def build_network_task1(x, nrecurrent_units, cell, y_, use_batch_norm):
@@ -476,8 +466,12 @@ def calc_log_p(preds, images_ip, gt_images, missing_pixels):
     mean_xent = np.mean(xent_gt, axis=0) 
     mx_mp = mean_xent_missing_pixels(mean_xent, missing_pixels)
     print('mean_xent_missing_pixels=%g' %(mx_mp))
+
+    fn = 'inpainting_' + str(int(num_missing_pixels)) + '_mps.npy'
+    np.save(open( fn, "wb" ), xent_ip_mp )
+    xent_ip_mp_test = np.load(open( fn, "rb" ) )
     
-    fn = 'data_' + str(num_missing_pixels) + '_mps.pi'
+    fn = 'data_' + str(int(num_missing_pixels)) + '_mps.pi'
     pi.dump( (np.mean(xent_ip_mp, axis=1), np.mean(xent_gt, axis=1)), open( fn, "wb" ) )
 #     (preds_rs, images_ip_784, gt_images, missing_pixels) = pi.load( open( inpaintings_data__filename, "rb" ) )
 
@@ -515,25 +509,23 @@ def t_test_one_vs_2x2():
     fn = 'data_' + str(num_missing_pixels) + '_mps.pi'
     (xent_ip_mp_4, xent_gt_4) = pi.load( open( fn, "rb" ) )
     
-    t_stat, p_value = ttest_ind(xent_gt_1, xent_gt_4, axis=None)    
+    _, p_value = ttest_ind(xent_gt_1, xent_gt_4, axis=None)    
     print('t-test p-value ground truth 1 vs 2x2=%g' %(p_value))
 
-    t_stat, p_value = ttest_ind(xent_ip_mp_1, xent_ip_mp_4, axis=None)
+    _, p_value = ttest_ind(xent_ip_mp_1, xent_ip_mp_4, axis=None)
     print('t-test p-value most probable in-painting 1 vs 2x2=%g' %(p_value))
     
-    exit()
-
 
 def task_3(y, x, y_, keep_prob, sess, root_dir, fn):   
 
 #     t_test_one_vs_2x2()
 
-    num_missing_pixels = 2; #2 or 4
+    num_missing_pixels = 4; #1 or 4
     inpaintings_data__filename = root_dir + '/inpaint_data/' + fn + '_task3_' + str(num_missing_pixels) + '.p'
 
     calc_inpaintings = False
     if calc_inpaintings:
-        if num_missing_pixels==2:
+        if num_missing_pixels==1:
             dataset = np.load(root_dir + '/one_pixel_inpainting.npy');num_in_paintings = 2    
         elif num_missing_pixels==4:
             dataset = np.load(root_dir + '/2X2_pixels_inpainting.npy');num_in_paintings = 16

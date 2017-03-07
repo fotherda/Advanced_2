@@ -2,24 +2,31 @@
 The PYTHONPATH I used was:
 PYTHONPATH:  ['C:\\Users\\Dave\\eclipse\\workspace\\Advanced_2\\src\\Advanced_2', 'C:\\Users\\Dave\\eclipse\\workspace\\Advanced_2\\src', '\\\\DAVESLENOVO710\\Users\\Dave\\Anaconda3\\pkgs\\tensorflow-0.12.1-py35_1\\Lib\\site-packages', 'C:\\Users\\Dave\\Documents\\GI13-Advanced\\Assignment1\\Advanced_1\\src', 'C:\\Users\\Dave\\Anaconda3\\pkgs\\tensorflow-0.12.1-py35_1\\Lib\\site-packages', 'C:\\Users\\Dave\\Anaconda3\\DLLs', 'C:\\Users\\Dave\\Anaconda3\\lib', 'C:\\Users\\Dave\\Anaconda3', 'C:\\Users\\Dave\\Anaconda3\\lib\\site-packages', 'C:\\Users\\Dave\\Anaconda3\\lib\\site-packages\\contextlib2-0.5.4-py3.5.egg', 'C:\\Users\\Dave\\Anaconda3\\lib\\site-packages\\cycler-0.10.0-py3.5.egg', 'C:\\Users\\Dave\\Anaconda3\\lib\\site-packages\\win32', 'C:\\Users\\Dave\\Anaconda3\\lib\\site-packages\\win32\\lib', 'C:\\Users\\Dave\\Anaconda3\\lib\\site-packages\\Pythonwin', 'C:\\Users\\Dave\\Anaconda3\\python35.zip']
 
-This needs to be adjusted to point to the equivalent locations on your machine
+This needs to be adjusted to point to the equivalent locations on your machine. 
+2 projects: Assignment1 and Advanced_2 are required.
 
 All the code is held at: 
 https://github.com/fotherda/Assignment1
 https://github.com/fotherda/Advanced_2
 
+and in the .zip archive under src/
 
+Place the final_models folder in the working directory.
+
+To run the evaluations the command is:
+
+python.exe -u /path/to/main_script.py [cmd line args see below]
 
 Task1:
 
 To run the LSTM models use the following cmd line arguments:
---model=P1_1x032_L -eval
+--model=P1_1x032_L -eval -bn
 --model=P1_1x064_L -eval -bn
 --model=P1_1x128_L -eval -bn
 --model=P1_3x032_L -eval
 
 To run the GRU models use the following cmd line arguments:
---model=P1_1x032_G -eval -bn
+--model=P1_1x032_G -eval 
 --model=P1_1x064_G -eval -bn
 --model=P1_1x128_G -eval -bn
 --model=P1_3x032_G -eval -bn
@@ -32,4 +39,21 @@ To run the GRU models use the following cmd line arguments:
 --model=P2_1x064_G -eval -bn
 --model=P2_1x128_G -eval -bn
 --model=P2_3x032_G -eval -bn
+
+NOTE: These models can take several minutes to evaluate given they use 10k test and 55k train examples
+
+
+Task 3:
+
+These files in the models directory:
+
+inpainting_1_mps.npy
+inpainting_4_mps.npy
+
+contain the most probable in-paintings for the one and 2x2 pixel in-paintings respectively.
+They can be loaded using the command:
+
+    most_prob_ip = np.load(open( 'inpainting_1_mps.npy', "rb" ) )
+    
+most_prob_ip will be a numpy array of shape (1000, 783) corresponding to the complete in-paintings for the 1000 supplied images
 
