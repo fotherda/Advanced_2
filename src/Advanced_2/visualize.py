@@ -11,7 +11,6 @@ from scipy.stats import ttest_ind
 from matplotlib.pyplot import figure, show, axes, sci
 import matplotlib.image as mpimg
 import matplotlib as mpl
-from matplotlib.colors import LinearSegmentedColormap
 from matplotlib import colors
 
 
@@ -20,26 +19,7 @@ cm = colors.ListedColormap(['grey','black', 'white'])
 bounds=[-10,-0.5,0.5, 10]
 norm = colors.BoundaryNorm(bounds, cm.N)
 
-def generate_in_paintings(model_probs, nsamples):
-    samples = np.random.uniform(size=(nsamples,model_probs.shape[0],model_probs.shape[1])) < model_probs
-    return samples.astype('float32')
-    
-def plot_figures(): 
-    
-#     plt.imshow(f)    
-    fig = plt.figure()
-    a=fig.add_subplot(1,2,1)
-    img = mpimg.imread('../_static/stinkbug.png')
-    lum_img = img[:,:,0]
-    imgplot = plt.imshow(lum_img)
-    a.set_title('Before')
-#     plt.colorbar(ticks=[0.1,0.3,0.5,0.7], orientation ='horizontal')
-    a=fig.add_subplot(1,2,2)
-    imgplot = plt.imshow(lum_img)
-#     imgplot.set_clim(0.0,0.7)
-    a.set_title('After')
-    plt.show()   
-    
+        
 def add_sub_plot(fig, img, nimages, nsamples, sub_plot_idx, i, title, first_col=False, first_col_label=None):
     a = fig.add_subplot(nimages, nsamples + 2, sub_plot_idx)
     a.axis('off')
@@ -127,7 +107,6 @@ def show_in_paintings(samples, images, file_name, repeat, nsteps):
     nimages = 10
 #     image_idxs = np.random.randint(0, len(images), (nimages))
     nsamples = 5  
-    w = h = 28
         
     fig = plt.figure()
     fig.patch.set_facecolor('grey')
@@ -136,7 +115,6 @@ def show_in_paintings(samples, images, file_name, repeat, nsteps):
 
     for i in range(nimages):
         image_idx = repeat*nimages + i
-#         rs = np.reshape(images[image_idx], (w,h))
         rs = get_fraction_of_ip(images[image_idx], nsteps)
         sub_plot_idx = add_sub_plot(fig, None, nimages, nsamples, sub_plot_idx, i, '', True, str(i))
         sub_plot_idx = add_sub_plot(fig, rs, nimages, nsamples, sub_plot_idx, i, 'gt')
@@ -144,7 +122,6 @@ def show_in_paintings(samples, images, file_name, repeat, nsteps):
         for sample_idx in range(nsamples):
             new_image = images[image_idx]
             new_image[-300:] = samples[sample_idx, image_idx, :]
-#             rs = np.reshape(new_image, (w,h))
             rs = get_fraction_of_ip(new_image, nsteps)
             sub_plot_idx = add_sub_plot(fig, rs, nimages, nsamples, sub_plot_idx, i, 's'+str((sample_idx+1)))
     
@@ -162,7 +139,6 @@ def get_cross_entropy(samples, images, model_probs, gt, file_name):
     xent_gt = np.zeros((nimages, npixels), dtype='float32')
     xent_ip = np.zeros((nimages, nsamples, npixels), dtype='float32')
     
-#     samples = generate_in_paintings(model_probs, nsamples) # 10 x 100 x 300
     images = np.squeeze(images, axis=2)
     
 #     show_report_in_paintings(samples, images, file_name, LUT_3x32)
@@ -182,13 +158,13 @@ def get_cross_entropy(samples, images, model_probs, gt, file_name):
     i=1
     print(i, '-step ground truth Xent', np.mean(xent_gt[:,:i]))
     print(i, '-step in-painting Xent', np.mean(xent_ip[:,0,:i])) #don't average across samples for some reason
+    _, p_value = ttest_ind(xent_gt[:,:i], xent_ip[:,0,:i], axis=None)
     print(i, '-step t-test: p=', p_value)
-    t_stat, p_value = ttest_ind(xent_gt[:,:i], xent_ip[:,0,:i], axis=None)
     
     for i in [10,28,300]:
         print(i, '-step ground truth Xent', np.mean(xent_gt[:,:i]))
         print(i, '-step in-painting Xent', np.mean(xent_ip[:,:,:i]))
         
-        t_stat, p_value = ttest_ind(xent_gt[:,:i], xent_ip[:,:,:i], axis=None)
+        _, p_value = ttest_ind(xent_gt[:,:i], xent_ip[:,:,:i], axis=None)
         print(i, '-step t-test: p=', p_value)
         

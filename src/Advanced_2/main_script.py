@@ -6,20 +6,12 @@ import argparse
 import sys
 import tensorflow as tf
 
-import Advanced_2 as a2
 import Advanced_2.part1 as p1        
-    
         
 
 def main(_): 
-    
-#     print(os.path.dirname(inspect.getfile(tensorflow)))
-#     cm.compare_confusion_matrices()
-    
-#     if FLAGS.model[:2]=='P1':
-        p1.run_part1_models(FLAGS)
-#     elif FLAGS.model[:2]=='P2':
-#         p2.run_part2_models(FLAGS)  
+    p1.run_models(FLAGS)
+   
    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
